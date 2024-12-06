@@ -4,6 +4,12 @@ audio-player-cli
 
 Minimal terminal youtube player.
 
+## Usage
+
+```bash
+./apcli [youtube-url]
+```
+
 
 ## Dependencies
 
