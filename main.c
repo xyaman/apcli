@@ -46,13 +46,19 @@ int main(int argc, char **argv) {
 
     PaError err;
 
+    // avoid alsa errors (at least in my pc)
+    FILE *og_stderr = stderr;
+    freopen("/dev/null", "w", stderr);
+
     printf("Initializing PortAudio\n");
     err = Pa_Initialize();
     if (err != paNoError) {
+        stderr = og_stderr;
         printf("PortAudio error: %s\n", Pa_GetErrorText(err));
-
         return 1;
     }
+
+    stderr = og_stderr;
 
     PaStream *stream;
     err = Pa_OpenDefaultStream(&stream, 0, CHANNELS, paFloat32, SAMPLE_RATE,
@@ -63,7 +69,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    printf("Starting stream..\n");
+    printf("Starting PortAudio stream..\n");
     err = Pa_StartStream(stream);
     if (err != paNoError) {
         Pa_Terminate();
@@ -73,6 +79,7 @@ int main(int argc, char **argv) {
 
     float buffer[BUFFER_SIZE * CHANNELS];
     size_t bytes_read;
+    printf("Playing...\n");
     while ((bytes_read = fread(buffer, sizeof(float), BUFFER_SIZE * CHANNELS,
                                ytdl_proc)) > 0) {
         err = Pa_WriteStream(stream, buffer, bytes_read / CHANNELS);
