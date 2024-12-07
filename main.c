@@ -1,8 +1,10 @@
 #include <portaudio.h>
 #include <stdio.h>
 
+#include "include/youtube.h"
+
 #define SAMPLE_RATE 44100
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 #define CHANNELS 2
 
 // FFMPEG OUTPUT (progress)
@@ -27,24 +29,24 @@ int main(int argc, char **argv) {
     /*FILE *ytdl_pipe = popen(*/
     /*    "yt-dlp -o - URL 2> /dev/null | ffmpeg -i pipe:0 -ac 2 -ar 44100 -f f32le pipe:1 -progress pipe:2 2> ffmpeg.txt","r");*/
 
+
     char command[512];
-
-    snprintf(command, 512, "yt-dlp -o - %s 2> /dev/null | ffmpeg -i pipe:0 -ac 2 -ar 44100 -f f32le pipe:1 2> /dev/null", argv[1]);
-    
-    FILE *ytdl_pipe = popen(command, "r");
-
-    if (!ytdl_pipe) {
+    //  download]   0.0% of  156.12MiB at  Unknown B/s ETA 
+    snprintf(command, 512, "yt-dlp -o - %s 2> yt-dlp.out | ffmpeg -i pipe:0 -ac %d -ar %d -f f32le pipe:1 2> /dev/null", argv[1], CHANNELS, SAMPLE_RATE);
+    printf("Starting yt-dlp and ffmpeg\n");
+    FILE *ytdl_proc = popen(command, "r");
+    if (!ytdl_proc) {
         printf("Can't open ytdl\n");
         return 1;
     }
 
-    /*FILE *file_d = popen("ffmpeg", "r");*/
-    /*if (!file_d) {*/
-    /*    printf("error\n");*/
-    /*    return 1;*/
-    /*}*/
+    yt_track_info info = yt_get_info(argv[1]);
+    printf("Title: %s\n", info.title);
+    printf("Duration: %s\n", info.string_duration);
 
     PaError err;
+
+    printf("Initializing PortAudio\n");
     err = Pa_Initialize();
     if (err != paNoError) {
         printf("PortAudio error: %s\n", Pa_GetErrorText(err));
@@ -53,11 +55,6 @@ int main(int argc, char **argv) {
     }
 
     PaStream *stream;
-
-    /*Pa_OpenDefaultStream(PaStream **stream, int numInputChannels, int
-     * numOutputChannels, PaSampleFormat sampleFormat, double sampleRate,
-     * unsigned long framesPerBuffer, PaStreamCallback *streamCallback, void
-     * *userData)*/
     err = Pa_OpenDefaultStream(&stream, 0, CHANNELS, paFloat32, SAMPLE_RATE,
                                BUFFER_SIZE, NULL, NULL);
     if (err != paNoError) {
@@ -77,15 +74,14 @@ int main(int argc, char **argv) {
     float buffer[BUFFER_SIZE * CHANNELS];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, sizeof(float), BUFFER_SIZE * CHANNELS,
-                               ytdl_pipe)) > 0) {
+                               ytdl_proc)) > 0) {
         err = Pa_WriteStream(stream, buffer, bytes_read / CHANNELS);
         if (err) {
             printf("[WriteStream] PortAudio error: %s\n", Pa_GetErrorText(err));
         }
     }
 
-    pclose(ytdl_pipe);
-    /*pclose(file_d);*/
+    pclose(ytdl_proc);
     err = Pa_CloseStream(stream);
     if (err != paNoError) {
         Pa_Terminate();
